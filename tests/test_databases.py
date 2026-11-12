@@ -331,6 +331,36 @@ async def test_ddl_queries(database_url):
             await database.execute(query)
 
 
+@pytest.mark.parametrize("database_url", DATABASE_URLS)
+@async_adapter
+async def test_ddl_create_index(database_url):
+    """
+    Test that `CreateIndex()` creates unique indexes defined on a table.
+    """
+    local_metadata = sqlalchemy.MetaData()
+    users = sqlalchemy.Table(
+        "users_ddl_index",
+        local_metadata,
+        sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True),
+        sqlalchemy.Column(
+            "email", sqlalchemy.String(length=100), unique=True, index=True
+        ),
+    )
+
+    async with Database(database_url) as database:
+        await database.execute(sqlalchemy.schema.DropTable(users, if_exists=True))
+        try:
+            await database.execute(sqlalchemy.schema.CreateTable(users))
+            for index in users.indexes:
+                await database.execute(sqlalchemy.schema.CreateIndex(index))
+
+            await database.execute(users.insert().values(email="a@example.com"))
+            with pytest.raises(Exception):
+                await database.execute(users.insert().values(email="a@example.com"))
+        finally:
+            await database.execute(sqlalchemy.schema.DropTable(users, if_exists=True))
+
+
 @pytest.mark.parametrize("exception", [Exception, asyncio.CancelledError])
 @pytest.mark.parametrize("database_url", DATABASE_URLS)
 @async_adapter

@@ -60,6 +60,12 @@ for table in metadata.tables.values():
     query = str(schema.compile(dialect=dialect))
     await database.execute(query=query)
 
+    # Create indexes separately, as CreateTable does not emit them
+    for index in table.indexes:
+        index_schema = sqlalchemy.schema.CreateIndex(index, if_not_exists=True)
+        index_query = str(index_schema.compile(dialect=dialect))
+        await database.execute(query=index_query)
+
 # Close all connections in the connection pool
 await database.disconnect()
 ```
